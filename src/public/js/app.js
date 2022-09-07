@@ -1,31 +1,43 @@
-const messageForm = document.querySelector("#message");
-const nickForm = document.querySelector("#nickname");
-const messageList = document.querySelector("ul");
-const fSocket = new WebSocket(`ws://${window.location.host}`);
+const socket = io();
+const startRoom = document.querySelector(`#start`);
+const room = document.querySelector(`#room`);
 
-function sendMsg(type, content) {
-  const msg = { type, content };
-  return JSON.stringify(msg);
+room.hidden = true;
+
+let roomName;
+
+function addMessage(message) {
+  const ul = room.querySelector(`ul`);
+  const li = document.createElement(`li`);
+  li.innerText = message;
+  ul.append(li);
 }
 
-function handleSubmit(e) {
+function handleStartSubmit(e) {
   e.preventDefault();
-  const input = messageForm.querySelector("input");
-  fSocket.send(sendMsg("New_message", input.value));
+  const nameInput = startRoom.querySelector(`input`);
+  socket.emit(`new_room`, nameInput.value, showRoom);
+  roomName = nameInput.value;
+  nameInput.value = "";
+}
+
+function handleMessageSubmit(e) {
+  e.preventDefault();
+  const input = room.querySelector(`input`);
+  const message = input.value;
+  socket.emit(`new_msg`, message, roomName, () => {
+    addMessage(`You:${message}`);
+  });
   input.value = "";
 }
-function handleNickSubmit(e) {
-  e.preventDefault();
-  const input = nickForm.querySelector("input");
-  fSocket.send(sendMsg("nickname", input.value));
-  input.value = "";
+
+function showRoom() {
+  startRoom.hidden = true;
+  room.hidden = false;
+  const roomTitle = room.querySelector(`h3`);
+  roomTitle.innerText = `Room : ${roomName}`;
+  const form = room.querySelector(`form`);
+  form.addEventListener(`submit`, handleMessageSubmit);
 }
-
-fSocket.addEventListener("message", (msg) => {
-  const li = document.createElement("li");
-  li.innerText = msg.data;
-  messageList.append(li);
-});
-
-messageForm.addEventListener("submit", handleSubmit);
-nickForm.addEventListener("submit", handleNickSubmit);
+socket.on("new_msg", addMessage);
+startRoom.addEventListener(`submit`, handleStartSubmit);

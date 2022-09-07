@@ -4,18 +4,23 @@ html(lang="en")
         meta(charset="UTF-8")
         meta(http-equiv="X-UA-Compatible", content="IE=edge")
         meta(name="viewport", content="width=device-width, initial-scale=1.0")
-        title Noom
+        title Noop
         link(rel="stylesheet", href="https://unpkg.com/mvp.css")
     body
         header
-            h1 Noom
+            h1 Noop
         main
-            h2 Welcome to Noom
-            form#nickname
-                input(type="text" placeholder="Write a message" required)
-                button Save
-            ul
-            form#message
-                input(type="text" placeholder="Write a message" required)
-                button Send
+            div#start
+                h2 Welcome to Noop
+                form
+                    input(placeholder="Room name" type="text" required)
+                    button Make room
+            div#room
+                h3
+                ul
+                form
+                    input(placeholder="Write Message" type="text" required)
+                    button Send Message
+
+        script(src=`/socket.io/socket.io.js`)
         script(src="/public/js/app.js") 

@@ -1,6 +1,6 @@
-import express, { json } from "express";
+import express from "express";
 import http from "http";
-import WebSocket from "ws";
+import { Server } from "socket.io";
 
 const app = express();
 
@@ -11,26 +11,20 @@ app.get("/", (req, res) => res.render("home"));
 
 const PORT = 4000;
 const handleListen = () => console.log(`Listening on http://localhost:${PORT}`);
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const httpServer = http.createServer(app);
+const wsServer = new Server(httpServer);
 
-const Sockets = [];
-
-wss.on("connection", (fSocket) => {
-  Sockets.push(fSocket);
-  fSocket["nickname"] = "Anon";
-  fSocket.on("message", (msg) => {
-    const message = JSON.parse(msg);
-    switch (message.type) {
-      case "New_message":
-        Sockets.forEach((aSocket) =>
-          aSocket.send(`${fSocket.nickname}: ${message.content}`)
-        );
-        break;
-      case "nickname":
-        fSocket["nickname"] = message.content;
-        break;
-    }
+wsServer.on(`connection`, (socket) => {
+  socket.on(`new_room`, (roomName, done) => {
+    socket.join(roomName);
+    done();
+  });
+  socket.on(`new_msg`, (message, room, done) => {
+    console.log(room);
+    console.log(message);
+    socket.to(room).emit(`new_msg`, message);
+    done();
   });
 });
-server.listen(PORT, handleListen);
+
+httpServer.listen(PORT, handleListen);
