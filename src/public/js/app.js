@@ -1,93 +1,170 @@
 const socket = io();
-const startRoom = document.querySelector(`#start`);
-const room = document.querySelector(`#room`);
-const nickRoom = document.querySelector(`#nickname`);
-const nickTitle = nickRoom.querySelector(`h3`);
 
-room.hidden = true;
-nickRoom.hidden = true;
+const myFace = document.querySelector(`#myFace`);
+const muteBtn = document.querySelector(`#mute`);
+const cameraBtn = document.querySelector(`#camera`);
+const selectCamera = document.querySelector(`#cameras`);
+const call = document.getElementById("call");
+
+call.hidden = true;
+
+let myStream;
+let muted = false;
+let cameraOff = false;
 let roomName;
-let nickname;
-function addMessage(message) {
-  const ul = room.querySelector(`ul`);
-  const li = document.createElement(`li`);
-  li.innerText = message;
-  ul.append(li);
+let PeerConnection;
+peerFace;
+async function getCameras() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter((device) => device.kind === "videoinput");
+    const currentCamera = myStream.getVideoTracks()[0];
+    cameras.forEach((camera) => {
+      const option = document.createElement("option");
+      option.value = camera.deviceId;
+      option.innerText = camera.label;
+      if (currentCamera.label === camera.label) {
+        option.selected = true;
+      }
+      selectCamera.appendChild(option);
+    });
+  } catch (e) {
+    console.log(e);
+  }
+}
+async function getMedia(deviceId) {
+  const initialConstrains = {
+    audio: true,
+    video: { facingMode: "user" },
+  };
+  const cameraConstraints = {
+    audio: true,
+    video: { deviceId: { exact: deviceId } },
+  };
+  try {
+    myStream = await navigator.mediaDevices.getUserMedia(
+      deviceId ? cameraConstraints : initialConstrains
+    );
+    myFace.srcObject = myStream;
+    if (!deviceId) {
+      await getCameras();
+    }
+  } catch (e) {
+    console.log(e);
+  }
 }
 
-function handleStartSubmit(e) {
-  e.preventDefault();
-  const rnameInput = startRoom.querySelector(`#rname`);
-  const nickInput = startRoom.querySelector(`#nick`);
-  socket.emit(`new_room`, rnameInput.value, nickInput.value, showRoom);
-  roomName = rnameInput.value;
-  nickname = nickInput.value;
-  rnameInput.value = "";
-  nickInput.value = "";
+async function handleCamChange() {
+  await getMedia(selectCamera.value);
+  if (PeerConnection) {
+    const videoTrack = myStream.getVideoTracks()[0];
+    const videoSender = PeerConnection.getSenders().find(
+      (sender) => sender.track.kind === "video"
+    );
+    videoSender.replaceTrack(videoTrack);
+  }
 }
 
-function handleMessageSubmit(e) {
+function handleMuteClick() {
+  myStream
+    .getAudioTracks()
+    .forEach((track) => (track.enabled = !track.enabled));
+  if (!muted) {
+    muteBtn.innerText = `unMute`;
+    muted = true;
+  } else {
+    muteBtn.innerText = `Mute`;
+    muted = false;
+  }
+}
+function handleCamClick() {
+  myStream
+    .getVideoTracks()
+    .forEach((track) => (track.enabled = !track.enabled));
+  if (!cameraOff) {
+    cameraBtn.innerText = `Camera On`;
+    cameraOff = true;
+  } else {
+    cameraBtn.innerText = `Camera Off`;
+    cameraOff = false;
+  }
+}
+
+muteBtn.addEventListener(`click`, handleMuteClick);
+cameraBtn.addEventListener(`click`, handleCamClick);
+selectCamera.addEventListener("input", handleCamChange);
+
+//Join a Room
+
+const joinRoom = document.querySelector(`#joinRoom`);
+const joinForm = joinRoom.querySelector(`form`);
+
+async function startMedia() {
+  joinRoom.hidden = true;
+  call.hidden = false;
+  await getMedia();
+  makePeer();
+}
+
+async function handleJoinSubmit(e) {
   e.preventDefault();
-  const input = room.querySelector(`input`);
-  const message = input.value;
-  socket.emit(`new_msg`, message, roomName, () => {
-    addMessage(`You:${message}`);
-  });
+  const input = joinForm.querySelector(`input`);
+  await startMedia();
+  roomName = input.value;
+  socket.emit(`join_room`, input.value);
   input.value = "";
 }
 
-function handleChangeNick(e) {
-  e.preventDefault();
-  const nickInput = nickRoom.querySelector(`input`);
-  let oldNick = nickname;
-  nickname = nickInput.value;
-  nickTitle.innerText = `Do you want to change your nickname? now : ${nickname}`;
-  socket.emit(`new_nick`, nickInput.value, oldNick);
-  nickInput.value = "";
-}
+joinForm.addEventListener(`submit`, handleJoinSubmit);
 
-function showRoom() {
-  startRoom.hidden = true;
-  room.hidden = false;
-  nickRoom.hidden = false;
-  const roomTitle = room.querySelector(`h3`);
-  roomTitle.innerText = `Room : ${roomName}`;
-  const msgForm = room.querySelector(`form`);
-  msgForm.addEventListener(`submit`, handleMessageSubmit);
-  nickTitle.innerText = `Do you want to change your nickname? now : ${nickname}`;
-  const nickForm = nickRoom.querySelector(`form`);
-  nickForm.addEventListener(`submit`, handleChangeNick);
-}
+// Socket
 
-function makeTitle(liveUser) {
-  const roomTitle = room.querySelector(`h3`);
-  roomTitle.innerText = `Room : ${roomName} (${liveUser})`;
-}
-
-socket.on(`welcome_msg`, (nick, liveUser) => {
-  makeTitle(liveUser);
-  addMessage(`Welcome to ${nick}`);
-});
-socket.on(`goodBye`, (nick, liveUser) => {
-  makeTitle(liveUser);
-  addMessage(`${nick} is left T.T`);
-});
-socket.on(`alertNickChange`, (newNick, oldNick) => {
-  addMessage(`${oldNick} is change to ${newNick}`);
+socket.on(`welcome`, async () => {
+  const offer = await PeerConnection.createOffer();
+  PeerConnection.setLocalDescription(offer);
+  socket.emit(`offer`, offer, roomName);
 });
 
-socket.on(`new_msg`, addMessage);
-socket.on("room_change", (rooms) => {
-  const roomList = startRoom.querySelector("ul");
-  roomList.innerHTML = "";
-  if (rooms.length === 0) {
-    return;
-  }
-  rooms.forEach((room) => {
-    const li = document.createElement("li");
-    li.innerText = room;
-    roomList.append(li);
+socket.on(`offer`, async (offer) => {
+  PeerConnection.setRemoteDescription(offer);
+  const answer = await PeerConnection.createAnswer();
+  PeerConnection.setLocalDescription(answer);
+  socket.emit(`answer`, answer, roomName);
+});
+socket.on(`answer`, (answer) => {
+  PeerConnection.setRemoteDescription(answer);
+});
+socket.on(`ice`, (ice) => {
+  PeerConnection.addIceCandidate(ice);
+});
+//RTC
+
+function makePeer() {
+  PeerConnection = new RTCPeerConnection({
+    iceServers: [
+      {
+        urls: [
+          "stun:stun.l.google.com:19302",
+          "stun:stun1.l.google.com:19302",
+          "stun:stun2.l.google.com:19302",
+          "stun:stun3.l.google.com:19302",
+          "stun:stun4.l.google.com:19302",
+        ],
+      },
+    ],
   });
-});
+  PeerConnection.addEventListener(`icecandidate`, handleIce);
+  PeerConnection.addEventListener(`addstream`, handleAddStream);
+  myStream
+    .getTracks()
+    .forEach((track) => PeerConnection.addTrack(track, myStream));
+}
 
-startRoom.addEventListener(`submit`, handleStartSubmit);
+function handleIce(data) {
+  socket.emit(`ice`, data.candidate, roomName);
+}
+
+function handleAddStream(data) {
+  const peerFace = document.querySelector(`#peerFace`);
+  peerFace.srcObject = data.stream;
+}

@@ -10,24 +10,16 @@ html(lang="en")
         header
             h1 Noop
         main
-            div#start
-                h2 Welcome to Noop
-                form
-                    input(id="rname" placeholder="Room name" type="text" required)
-                    input(id="nick" placeholder="Nickname" type="text" required)
-                    button Join room
-                h4 Open Rooms&rarr;
-                ul
-            div#room
-                h3
-                ul
-                form
-                    input(placeholder="Write Message" type="text" required)
-                    button Send Message
-            div#nickname
-                h3 
-                form
-                    input(placeholder="Write new nickname" type="text" required)
-                    button change
+            div#joinRoom
+                    form    
+                        input(placeholder="room name", required, type="text")
+                        button Enter room
+            div#call
+                div#myStream
+                    video#myFace(autoplay,playsinline, muted, width="400", height="400")
+                    button#mute Mute
+                    button#camera Camera Off
+                    select#cameras
+                video#peerFace(autoplay,playsinline, width="400", height="400")
         script(src=`/socket.io/socket.io.js`)
         script(src="/public/js/app.js") 
