@@ -12,14 +12,21 @@ html(lang="en")
         main
             div#joinRoom
                     form    
-                        input(placeholder="room name", required, type="text")
+                        input#room(placeholder="room name", required, type="text")
+                        input#nick(placeholder="Your name", required, type="text")
                         button Enter room
-            div#call
-                div#myStream
-                    video#myFace(autoplay,playsinline, muted, width="400", height="400")
-                    button#mute Mute
-                    button#camera Camera Off
-                    select#cameras
-                video#peerFace(autoplay,playsinline, width="400", height="400")
+            div#hide             
+                div#call(style="display:flex")
+                    div#myStream
+                        video#myFace(autoplay,playsinline, muted, width="400", height="400")
+                        button#mute Mute
+                        button#camera Camera Off
+                        select#cameras
+                    video#peerFace(autoplay,playsinline, width="400", height="400")
+            div#msgBox
+                ul
+                form
+                    input(placeholder="Write a message", required, type="text")
+                    button Send
         script(src=`/socket.io/socket.io.js`)
         script(src="/public/js/app.js") 

@@ -4,16 +4,19 @@ const myFace = document.querySelector(`#myFace`);
 const muteBtn = document.querySelector(`#mute`);
 const cameraBtn = document.querySelector(`#camera`);
 const selectCamera = document.querySelector(`#cameras`);
-const call = document.getElementById("call");
+const hide = document.querySelector("#hide");
+const msgBox = document.querySelector(`#msgBox`);
 
-call.hidden = true;
+hide.hidden = true;
+msgBox.hidden = true;
 
 let myStream;
 let muted = false;
 let cameraOff = false;
 let roomName;
 let PeerConnection;
-peerFace;
+let DataChannel;
+
 async function getCameras() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
@@ -101,31 +104,45 @@ const joinForm = joinRoom.querySelector(`form`);
 
 async function startMedia() {
   joinRoom.hidden = true;
-  call.hidden = false;
+  hide.hidden = false;
+  msgBox.hidden = false;
   await getMedia();
   makePeer();
 }
 
 async function handleJoinSubmit(e) {
   e.preventDefault();
-  const input = joinForm.querySelector(`input`);
+  const room = joinForm.querySelector(`#room`);
+  const nick = joinForm.querySelector(`#nick`);
   await startMedia();
-  roomName = input.value;
-  socket.emit(`join_room`, input.value);
-  input.value = "";
+  roomName = room.value;
+  socket.emit(`join_room`, room.value, nick.value);
+  room.value = "";
+  nick.value = "";
 }
 
 joinForm.addEventListener(`submit`, handleJoinSubmit);
 
 // Socket
 
-socket.on(`welcome`, async () => {
+socket.on(`welcome`, async (nickName) => {
+  DataChannel = PeerConnection.createDataChannel(`chat`);
+  DataChannel.addEventListener(`message`, (e) => {
+    console.log(nickName);
+    addMsg(`${nickName} : ${e.data}`);
+  });
   const offer = await PeerConnection.createOffer();
   PeerConnection.setLocalDescription(offer);
-  socket.emit(`offer`, offer, roomName);
+  socket.emit(`offer`, offer, roomName, nickName);
 });
 
-socket.on(`offer`, async (offer) => {
+socket.on(`offer`, async (offer, nickName) => {
+  PeerConnection.addEventListener("datachannel", (event) => {
+    DataChannel = event.channel;
+    DataChannel.addEventListener("message", (e) => {
+      addMsg(`${nickName} : ${e.data}`);
+    });
+  });
   PeerConnection.setRemoteDescription(offer);
   const answer = await PeerConnection.createAnswer();
   PeerConnection.setLocalDescription(answer);
@@ -168,3 +185,22 @@ function handleAddStream(data) {
   const peerFace = document.querySelector(`#peerFace`);
   peerFace.srcObject = data.stream;
 }
+
+//DataChannel
+
+const msgForm = msgBox.querySelector(`form`);
+
+function handleMsgSubmit(e) {
+  e.preventDefault();
+  const msgInput = msgForm.querySelector(`input`);
+  DataChannel.send(msgInput.value);
+  addMsg(`Me : ${msgInput.value}`);
+  msgInput.value = "";
+}
+function addMsg(message) {
+  const msgList = msgBox.querySelector(`ul`);
+  const msg = document.createElement(`li`);
+  msg.innerText = message;
+  msgList.append(msg);
+}
+msgForm.addEventListener(`submit`, handleMsgSubmit);

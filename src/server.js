@@ -15,12 +15,12 @@ const httpServer = http.createServer(app);
 const wsServer = new Server(httpServer);
 
 wsServer.on(`connection`, (socket) => {
-  socket.on(`join_room`, (roomName) => {
+  socket.on(`join_room`, (roomName, nickName) => {
     socket.join(roomName);
-    socket.to(roomName).emit(`welcome`);
+    socket.to(roomName).emit(`welcome`, nickName);
   });
-  socket.on(`offer`, (offer, roomName) => {
-    socket.to(roomName).emit(`offer`, offer);
+  socket.on(`offer`, (offer, roomName, nickName) => {
+    socket.to(roomName).emit(`offer`, offer, nickName);
   });
   socket.on(`answer`, (answer, roomName) => {
     socket.to(roomName).emit(`answer`, answer);
